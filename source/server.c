@@ -8,7 +8,7 @@
 #define TOTALAPLHA 26
 #define S_PATH "/tmp/socket"
 #define BACKLOG 5
-#define BUFFER_SIZE 1025
+#define BUFFER_SIZE 1026
 
 void caesar_encrypt(char *message, int shift);
 
@@ -74,17 +74,22 @@ void main(int argc, char* argv[])
 
     char buffer[BUFFER_SIZE];
     size_t bytes_read;
-    size_t total_bytes_read = 0;
-    ssize_t bytes = recv(s_socket, buffer, BUFFER_SIZE - 1,0);
-    if (bytes > 0) 
+    bytes_read = recv(s_socket, buffer, BUFFER_SIZE, 0);
+
+    if (bytes_read == BUFFER_SIZE) {
+        printf("Content of received message is too large\n");
+        char* err_msg = "Content size too large - Server will only process up to 1024 bytes at a time.\n";
+        strncpy(buffer, err_msg, BUFFER_SIZE - 1);
+        buffer[BUFFER_SIZE - 1] = '\0';
+    }else
     {
+    buffer[bytes_read] = '\0';
+
+        printf("Received Message: %s\n", buffer);
+        printf("Bytes Read: %ld\n", bytes_read);
+
         caesar_encrypt(buffer, shift);
-        buffer[bytes] = '\0';
-
-        if (bytes >= BUFFER_SIZE) {
-            printf("Content size too large - Server will only return up to 128 bytes.");
-        }
-
+        printf("Encrypted Message: %s\n", buffer);
     }
 
     if (send(s_socket, buffer, strlen(buffer), 0) == -1) 
@@ -93,7 +98,7 @@ void main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("Sending Encrypted Content: %s",buffer);
+    //printf("Sending Encrypted Content: %s",buffer);
 
     close(s_socket);
     close(server_socket);

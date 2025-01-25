@@ -23,15 +23,22 @@ void main(int argc, char* argv[])
 
     strncpy(file_name, argv[1], FILE_NAME_SIZE - 1);
     file_name[FILE_NAME_SIZE - 1] = '\0';
-
-    printf("File content: %s", read_file(file_name));
-    printf("File size: %d\n\n", get_file_size(file_name));
-
+    read_file(file_name);
+    if(get_file_size(file_name) == -1)
+    {
+        exit(EXIT_FAILURE);
+    }
     if(get_file_size(file_name) == 0)
     {
         printf("ERR: File is empty\n");
         exit(EXIT_FAILURE);
     }
+    if(get_file_size(file_name) > 0)
+    {
+    printf("File content: %s", read_file(file_name));
+    printf("File size: %d\n\n", get_file_size(file_name));
+    }
+
 
     struct sockaddr_un addr;
     int client_socket = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -63,7 +70,7 @@ void main(int argc, char* argv[])
     printf("Message Sent to the Server......\n\n");
 
 
-    char buffer[1024];
+    char buffer[1025];
     ssize_t bytes = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
     if (bytes > 0) {
         buffer[bytes] = '\0';
@@ -82,7 +89,7 @@ char* read_file(char* filename)
 
     file = fopen(filename,"r");
     if (file==NULL){
-        printf("Error: File not found\n");
+        printf("ERR: File not found\n");
         return NULL;
     }
 
@@ -107,7 +114,6 @@ int get_file_size(char* filename)
 
     file = fopen(filename,"r");
     if (file==NULL){
-        printf("Error: File not found\n");
         return -1;
     }
 
