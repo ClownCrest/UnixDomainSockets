@@ -55,7 +55,7 @@ void main(int argc, char* argv[])
 
     if (connect(client_socket, (struct sockaddr*)&addr, sizeof(addr)) == -1)
     {
-        perror("Connection error");
+        printf("ERR: Connection error. Server is not running\n");
         exit(EXIT_FAILURE);
     }
 
