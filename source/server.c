@@ -4,6 +4,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <signal.h>
+
 #define BASE 10
 #define TOTALAPLHA 26
 #define S_PATH "/tmp/socket"
@@ -11,6 +13,10 @@
 #define BUFFER_SIZE 1026
 
 void caesar_encrypt(char *message, int shift);
+void handle_signal(int signal);
+void cleanup();
+
+int server_socket;
 
 void main(int argc, char* argv[])
 {
@@ -32,7 +38,11 @@ void main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
+
     struct sockaddr_un addr;
+
+    signal(SIGINT, handle_signal);
+
     int server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_socket == -1)
     {
@@ -54,6 +64,7 @@ void main(int argc, char* argv[])
     if (bind(server_socket, (struct sockaddr*)&addr, sizeof(addr)) == -1)
     {
         perror("Binding error");
+        cleanup();
         exit(EXIT_FAILURE);
     }
 
@@ -61,54 +72,52 @@ void main(int argc, char* argv[])
     if (listen(server_socket, BACKLOG) == -1)
     {
         perror("Listen error");
+        cleanup();
         exit(EXIT_FAILURE);
     }
 
-    printf("Listening...\n");
+    printf("Listening...\n\n");
 
-    int s_socket = accept(server_socket, NULL, NULL);
-    if (s_socket == -1) {
-        perror("Accept Error");
-        exit(EXIT_FAILURE);
-    }
-
-    char buffer[BUFFER_SIZE];
-    size_t bytes_read;
-    bytes_read = recv(s_socket, buffer, BUFFER_SIZE, 0);
-
-    if (bytes_read == BUFFER_SIZE) {
-        printf("Content of received message is too large\n");
-        char* err_msg = "Content size too large - Server will only process up to 1024 bytes at a time.\n";
-        strncpy(buffer, err_msg, BUFFER_SIZE - 1);
-        buffer[BUFFER_SIZE - 1] = '\0';
-    }else
+    while(1)
     {
-    buffer[bytes_read] = '\0';
+        int s_socket = accept(server_socket, NULL, NULL);
+        if (s_socket == -1) {
+            perror("Accept Error");
+            continue;
+        }
 
-        printf("Received Message: %s\n", buffer);
-        printf("Bytes Read: %ld\n", bytes_read);
+        char buffer[BUFFER_SIZE];
+        size_t bytes_read;
+        bytes_read = recv(s_socket, buffer, BUFFER_SIZE, 0);
 
-        caesar_encrypt(buffer, shift);
-        printf("Encrypted Message: %s\n", buffer);
-    }
+        if (bytes_read == BUFFER_SIZE) {
+            printf("Content of received message is too large\n\n");
+            char* err_msg = "Content size too large - Server will only process up to 1024 bytes at a time.\n";
+            strncpy(buffer, err_msg, BUFFER_SIZE - 1);
+            buffer[BUFFER_SIZE - 1] = '\0';
+        }else
+        {
+        buffer[bytes_read] = '\0';
 
-    if (send(s_socket, buffer, strlen(buffer), 0) == -1) 
-    {
-        perror("Server Response Error");
-        exit(EXIT_FAILURE);
-    }
+            printf("Bytes Read: %ld\n", bytes_read);
 
-    //printf("Sending Encrypted Content: %s",buffer);
+            caesar_encrypt(buffer, shift);
+            printf("Encrypted Message Sent\n\n");
+        }
 
-    close(s_socket);
-    close(server_socket);
-    if (unlink(S_PATH) == -1) 
-    {
-        perror("Unlink Err");
-        exit(EXIT_FAILURE);
+        if (send(s_socket, buffer, strlen(buffer), 0) == -1) 
+        {
+            perror("Server Response Error");
+            exit(EXIT_FAILURE);
+        }
+
+        //printf("Sending Encrypted Content: %s",buffer);
+
+        close(s_socket);
     }
 
 }
+
 void caesar_encrypt(char *message, int shift)
 {
     int i;
@@ -122,5 +131,28 @@ void caesar_encrypt(char *message, int shift)
         {
             message[i] = (char)(((message[i] - 'A' + shift) % TOTALAPLHA + TOTALAPLHA) % TOTALAPLHA + 'A');
         }
+    }
+}
+
+void handle_signal(int signal)
+{
+    if (signal == SIGINT)
+    {
+        printf("\nCaught SIGINT (Ctrl+C). Shutting down gracefully...\n");
+        cleanup();
+        exit(EXIT_SUCCESS);
+    }
+}
+
+void cleanup()
+{
+    if (server_socket != -1)
+    {
+        close(server_socket);
+        printf("Server socket closed gracefully\n");
+    }
+    if (unlink(S_PATH) == -1)
+    {
+        perror("Error unlinking socket file");
     }
 }
