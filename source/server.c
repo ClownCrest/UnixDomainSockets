@@ -8,6 +8,7 @@
 #define TOTALAPLHA 26
 #define S_PATH "/tmp/socket"
 #define BACKLOG 5
+#define BUFFER_SIZE 1025
 
 void caesar_encrypt(char *message, int shift);
 
@@ -71,31 +72,23 @@ void main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    char buffer[1025];
+    char buffer[BUFFER_SIZE];
     size_t bytes_read;
     size_t total_bytes_read = 0;
-    while ((bytes_read = recv(s_socket, buffer + total_bytes_read, (sizeof(buffer) - 1), 0)) >0)
+    ssize_t bytes = recv(s_socket, buffer, BUFFER_SIZE - 1,0);
+    if (bytes > 0) 
     {
-        total_bytes_read += bytes_read;
+        caesar_encrypt(buffer, shift);
+        buffer[bytes] = '\0';
 
-        if (bytes_read > 0 )
-        {
-            buffer[bytes_read] = '\0';
-            printf("Received: %s\n\n", buffer);
-            printf("Shift Value: %d\n\n", shift);
-            caesar_encrypt(buffer, shift);
-            printf("Bytes Read: %ld\n", bytes_read);
+        if (bytes >= BUFFER_SIZE) {
+            printf("Content size too large - Server will only return up to 128 bytes.");
         }
-        if (total_bytes_read >= 1024) 
-        {
-        const char *error_message = "Content size too large - Server will only return up to 1024 bytes.\n";
-        strncpy(buffer, error_message, sizeof(buffer) - 1);
-        buffer[sizeof(buffer) - 1] = '\0';
-        break;
-        }
+
     }
 
-    if (send(s_socket, buffer, strlen(buffer), 0) == -1) {
+    if (send(s_socket, buffer, strlen(buffer), 0) == -1) 
+    {
         perror("Server Response Error");
         exit(EXIT_FAILURE);
     }
@@ -104,7 +97,8 @@ void main(int argc, char* argv[])
 
     close(s_socket);
     close(server_socket);
-    if (unlink(S_PATH) == -1) {
+    if (unlink(S_PATH) == -1) 
+    {
         perror("Unlink Err");
         exit(EXIT_FAILURE);
     }
