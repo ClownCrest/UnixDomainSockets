@@ -1,0 +1,18 @@
+digraph DomainSocket {
+    rankdir=LR;
+
+    // Nodes
+    Client [label="Client" shape=box style=filled fillcolor=lightblue];
+    Server [label="Server" shape=box style=filled fillcolor=lightgreen];
+    DomainSocket [label="/tmp/socket\n(Domain Socket)" shape=ellipse style=filled fillcolor=lightgrey];
+    File [label="File\n(Plaintext)" shape=oval style=filled fillcolor=lightyellow];
+    EncryptedMessage [label="Encrypted Message" shape=oval style=filled fillcolor=orange];
+
+    // Edges
+    File -> Client [label="Read plaintext from file"];
+    Client -> DomainSocket [label="Connect to socket\n(Send plaintext)"];
+    DomainSocket -> Server [label="Server receives plaintext"];
+    Server -> DomainSocket [label="Encrypt with Caesar cipher\n(Send encrypted message)"];
+    DomainSocket -> Client [label="Client receives encrypted message"];
+    Client -> EncryptedMessage [label="Display encrypted message"];
+}
