@@ -5,12 +5,14 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <string.h>
+#include <stdbool.h>
 
 #define BASE 10
 #define TOTALAPLHA 26
 #define S_PATH "/tmp/socket"
 #define BACKLOG 5
-#define BUFFER_SIZE 1026
+#define BUFFER_SIZE 1024
 
 void caesar_encrypt(char *message, int shift);
 void handle_signal(int signal);
@@ -25,19 +27,18 @@ void main(int argc, char* argv[])
 
     if (argc != 2)
     {
-        fprintf(stderr, "Usage: %s <Shift> \n", argv[0]);
+        fprintf(stderr, "Usage: %s <Shift>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     char *endptr;
     shift = strtol(argv[1], &endptr, 10);
 
-    if (*endptr != '\0') 
+    if (*endptr != '\0')
     {
-        fprintf(stderr, "Usage: %s <Shift Must be an integer> \n", argv[0]);
+        fprintf(stderr, "Usage: %s <Shift Must be an integer>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
-
 
     struct sockaddr_un addr;
 
@@ -55,8 +56,7 @@ void main(int argc, char* argv[])
     sun_path_max_length = sizeof(addr.sun_path);
     strncpy(addr.sun_path, S_PATH, sun_path_max_length);
 
-
-    if (access(S_PATH,F_OK ) == 0) 
+    if (access(S_PATH, F_OK) == 0)
     {
         unlink(S_PATH);
     }
@@ -68,7 +68,6 @@ void main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-
     if (listen(server_socket, BACKLOG) == -1)
     {
         perror("Listen error");
@@ -78,56 +77,69 @@ void main(int argc, char* argv[])
 
     printf("Listening...\n\n");
 
-    while(1)
+    while (1)
     {
+        printf("Waiting for a connection...\n\n");
         int s_socket = accept(server_socket, NULL, NULL);
-        if (s_socket == -1) {
+        if (s_socket == -1)
+        {
             perror("Accept Error");
             continue;
         }
 
         char buffer[BUFFER_SIZE];
-        size_t bytes_read;
-        bytes_read = recv(s_socket, buffer, BUFFER_SIZE, 0);
-
-        if (bytes_read == BUFFER_SIZE) {
-            printf("Content of received message is too large\n\n");
-            char* err_msg = "Content size too large - Server will only process up to 1024 bytes at a time.\n";
-            strncpy(buffer, err_msg, BUFFER_SIZE - 1);
-            buffer[BUFFER_SIZE - 1] = '\0';
-        }else
+        memset(buffer, 0, sizeof(buffer));
+        ssize_t bytes_read;
+        bool done_receiving = false;  
+        printf("Client connected.\n");
+        while (!done_receiving)
         {
-        buffer[bytes_read] = '\0';
+            bytes_read = recv(s_socket, buffer, BUFFER_SIZE, 0);
 
-            printf("Bytes Read: %ld\n", bytes_read);
+            if (bytes_read > 0)
+            {
+                buffer[bytes_read] = '\0';  
 
-            caesar_encrypt(buffer, shift);
-            printf("Encrypted Message Sent\n\n");
+                caesar_encrypt(buffer, shift);
+
+                send(s_socket, buffer, strlen(buffer), 0); 
+
+                
+                if (bytes_read < BUFFER_SIZE)
+                {
+                    done_receiving = true;
+                }
+            }
+            else if (bytes_read == 0)
+            {
+                done_receiving = true;
+                printf("Client closed the connection.\n");
+            }
+            else
+            {
+                perror("Receive error");
+                done_receiving = true;
+            }
         }
 
-        if (send(s_socket, buffer, strlen(buffer), 0) == -1) 
-        {
-            perror("Server Response Error");
-            exit(EXIT_FAILURE);
-        }
-
-        //printf("Sending Encrypted Content: %s",buffer);
-
+        printf("Finished sending data.\n");
         close(s_socket);
+        printf("Client Disconnected.\n\n");
     }
 
+    cleanup();
 }
 
 void caesar_encrypt(char *message, int shift)
 {
     int i;
-    for(i = 0; message[i] != '\0'; i++)
+    for (i = 0; message[i] != '\0'; i++)
     {
-        if(message[i] >= 'a' && message[i] <= 'z')
+        if (message[i] >= 'a' && message[i] <= 'z')
         {
             message[i] = (char)(((message[i] - 'a' + shift) % TOTALAPLHA + TOTALAPLHA) % TOTALAPLHA + 'a');
         }
-        else if(message[i] >= 'A' && message[i] <= 'Z')
+        else if (message[i] >= 'A' && message[i] <= 'Z')
         {
             message[i] = (char)(((message[i] - 'A' + shift) % TOTALAPLHA + TOTALAPLHA) % TOTALAPLHA + 'A');
         }

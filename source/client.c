@@ -4,8 +4,12 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <string.h>
+#include <stdbool.h>
+
 #define FILE_NAME_SIZE 1024
 #define S_PATH "/tmp/socket"
+#define BUFFER_SIZE 1024
 
 char* read_file(char* filename);
 int get_file_size(char* filename);
@@ -23,28 +27,33 @@ void main(int argc, char* argv[])
 
     strncpy(file_name, argv[1], FILE_NAME_SIZE - 1);
     file_name[FILE_NAME_SIZE - 1] = '\0';
-    read_file(file_name);
-    if(get_file_size(file_name) == -1)
+
+    char* file_content = read_file(file_name);
+
+    long file_size = get_file_size(file_name);
+    if (file_size == -1)
     {
+        printf("ERR: File not found\n");
+        free(file_content);
         exit(EXIT_FAILURE);
-    }
-    if(get_file_size(file_name) == 0)
-    {
-        printf("ERR: File is empty\n");
-        exit(EXIT_FAILURE);
-    }
-    if(get_file_size(file_name) > 0)
-    {
-    printf("File content: %s", read_file(file_name));
-    printf("File size: %d\n\n", get_file_size(file_name));
     }
 
+    if (file_size == 0)
+    {
+        printf("ERR: File is empty\n");
+        free(file_content);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("File content:\n%s\n\n", file_content);
+    printf("File size: %ld bytes\n\n", file_size);
 
     struct sockaddr_un addr;
     int client_socket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (client_socket == -1)
     {
         perror("Socket creation error");
+        free(file_content);
         exit(EXIT_FAILURE);
     }
 
@@ -56,29 +65,61 @@ void main(int argc, char* argv[])
     if (connect(client_socket, (struct sockaddr*)&addr, sizeof(addr)) == -1)
     {
         printf("ERR: Connection error. Server is not running\n");
+        free(file_content);
+        close(client_socket);
         exit(EXIT_FAILURE);
     }
 
-     printf("Connected to Server.............\n");
+    printf("Connected to the server...\n");
 
-    if (send(client_socket, read_file(file_name), get_file_size(file_name), 0) == -1)
+    if (send(client_socket, file_content, file_size, 0) == -1)
     {
         perror("Sending error");
+        free(file_content);
+        close(client_socket);
         exit(EXIT_FAILURE);
     }
 
-    printf("Message Sent to the Server......\n\n");
+    printf("Message sent to the server.\n\n");
+    free(file_content);
 
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, sizeof(buffer));
 
-    char buffer[1025];
-    ssize_t bytes = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
-    if (bytes > 0) {
-        buffer[bytes] = '\0';
-        printf("Encrypted Message Received: %s\n", buffer);
+    ssize_t bytes_received;
+    bool done_receiving = false;
+
+    printf("Encrypted message received from the server:\n");
+
+    while (!done_receiving)
+    {
+        bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0);
+
+        if (bytes_received > 0)
+        {
+            buffer[bytes_received] = '\0'; 
+            printf("%s", buffer);
+
+            
+            if (bytes_received < BUFFER_SIZE)
+            {
+                done_receiving = true; 
+            }
+        }
+        else if (bytes_received == 0)
+        {
+            done_receiving = true; 
+            printf("\nServer closed the connection.\n");
+        }
+        else
+        {
+            perror("Receiving error");
+            done_receiving = true;
+        }
     }
 
-    close(client_socket); 
-
+    printf("\nDiscnnected from the server\n");
+    close(client_socket);
 }
 
 char* read_file(char* filename)
@@ -87,17 +128,25 @@ char* read_file(char* filename)
     char *buffer;
     long file_size;
 
-    file = fopen(filename,"r");
-    if (file==NULL){
+    file = fopen(filename, "r");
+    if (file == NULL)
+    {
         printf("ERR: File not found\n");
         return NULL;
     }
 
     file_size = get_file_size(filename);
+    if (file_size <= 0)
+    {
+        fclose(file);
+        return NULL;
+    }
 
-    buffer = (char*) malloc(file_size * sizeof(char));
-    if (buffer == NULL){
+    buffer = (char*)malloc(file_size * sizeof(char));
+    if (buffer == NULL)
+    {
         printf("Error: Memory allocation failed\n");
+        fclose(file);
         return NULL;
     }
 
@@ -107,25 +156,18 @@ char* read_file(char* filename)
 }
 
 int get_file_size(char* filename)
-
 {
     FILE *file;
     long file_size;
 
-    file = fopen(filename,"r");
-    if (file==NULL){
+    file = fopen(filename, "r");
+    if (file == NULL)
+    {
         return -1;
     }
 
-    fseek(file, 0 , SEEK_END);
+    fseek(file, 0, SEEK_END);
     file_size = ftell(file);
     fclose(file);
     return file_size;
 }
-
-
-
-
-
-
-
