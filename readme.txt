@@ -4,7 +4,7 @@ This client/server application demonstrates inter-process communication using UN
 
 ## Installing:
 ### Obtaining
-  ```git clone ```
+  ```git clone https://github.com/ClownCrest/UnixDomainSockets```
 ### Building
   ```gcc server.c -o server```
   ```gcc client.c -o client```
