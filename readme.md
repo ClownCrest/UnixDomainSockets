@@ -5,17 +5,24 @@ This client/server application demonstrates inter-process communication using UN
 ## Installing:
 
 ### Obtaining
-  ``` git clone https://github.com/ClownCrest/UnixDomainSockets ```
+```sh
+git clone https://github.com/ClownCrest/UnixDomainSockets
+```
 
 ### Building
-  ```gcc server.c -o server```
-  ```gcc client.c -o client```
+```sh
+gcc server.c -o server
+gcc client.c -o client
+```
 
 ### Running
-  ```./server <shift>```
-  ```./client <filename>```
+```sh
+./server <shift>
+./client <filename>
+```
   
 ## Examples
-
+```sh
 ./server 10
 ./client hello.txt
+```
